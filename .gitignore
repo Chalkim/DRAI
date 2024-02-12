@@ -6,3 +6,5 @@
 
 /simulation/*/*.pyc
 /simulation/*.pyc
+
+/.vscode
