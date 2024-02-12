@@ -15,10 +15,10 @@ public:
 	static const uint64_t lineRateValues[8];
 	union{
 		struct {
-			uint64_t lineRate: 64-timeWidth-bytesWidth-qlenWidth,
-					 time: timeWidth,
-					 bytes: bytesWidth,
-					 qlen: qlenWidth;
+			uint64_t lineRate: 64-timeWidth-bytesWidth-qlenWidth,  // B
+					 time: timeWidth,                              // TS
+					 bytes: bytesWidth,                            // rxBytes
+					 qlen: qlenWidth;                              // qLen
 		};
 		uint32_t buf[2];
 	};
