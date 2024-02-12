@@ -1,0 +1,8 @@
+/simulation/html
+/simulation/build
+/simulation/.waf-*
+/simulation/.lock-waf*
+/simulation/latex
+
+/simulation/*/*.pyc
+/simulation/*.pyc
