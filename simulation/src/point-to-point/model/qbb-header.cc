@@ -33,6 +33,11 @@ namespace ns3 {
 		m_seq = seq;
 	}
 
+	void qbbHeader::SetFn(uint32_t fn)
+	{
+		m_fn = fn;
+	}
+
 	void qbbHeader::SetSport(uint32_t _sport){
 		sport = _sport;
 	}
@@ -59,6 +64,11 @@ namespace ns3 {
 	uint32_t qbbHeader::GetSeq() const
 	{
 		return m_seq;
+	}
+
+	uint32_t qbbHeader::GetFn() const
+	{
+		return m_fn;
 	}
 
 	uint16_t qbbHeader::GetSport() const{
@@ -110,6 +120,7 @@ namespace ns3 {
 		i.WriteU16(flags);
 		i.WriteU16(m_pg);
 		i.WriteU32(m_seq);
+		i.WriteU32(m_fn);
 
 		// write IntHeader
 		ih.Serialize(i);
@@ -123,6 +134,7 @@ namespace ns3 {
 		flags = i.ReadU16();
 		m_pg = i.ReadU16();
 		m_seq = i.ReadU32();
+		m_fn = i.ReadU32();
 
 		// read IntHeader
 		ih.Deserialize(i);

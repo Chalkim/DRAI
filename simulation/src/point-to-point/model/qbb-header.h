@@ -36,6 +36,7 @@ public:
    */
   void SetPG (uint16_t pg);
   void SetSeq(uint32_t seq);
+  void SetFn(uint32_t fn);
   void SetSport(uint32_t _sport);
   void SetDport(uint32_t _dport);
   void SetTs(uint64_t ts);
@@ -48,6 +49,7 @@ public:
    */
   uint16_t GetPG () const;
   uint32_t GetSeq() const;
+  uint32_t GetFn() const;
   uint16_t GetPort() const;
   uint16_t GetSport() const;
   uint16_t GetDport() const;
@@ -67,6 +69,7 @@ private:
   uint16_t flags;
   uint16_t m_pg;
   uint32_t m_seq; // the qbb sequence number.
+  uint32_t m_fn; // JIANG: flow number
   IntHeader ih;
   
 };
