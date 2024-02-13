@@ -12,12 +12,12 @@ namespace ns3 {
 	NS_OBJECT_ENSURE_REGISTERED(qbbHeader);
 
 	qbbHeader::qbbHeader(uint16_t pg)
-		: m_pg(pg), sport(0), dport(0), flags(0), m_seq(0)
+		: m_pg(pg), sport(0), dport(0), flags(0), m_seq(0), m_fn(0)
 	{
 	}
 
 	qbbHeader::qbbHeader()
-		: m_pg(0), sport(0), dport(0), flags(0), m_seq(0)
+		: m_pg(0), sport(0), dport(0), flags(0), m_seq(0), m_fn(0)
 	{}
 
 	qbbHeader::~qbbHeader()
@@ -102,7 +102,7 @@ namespace ns3 {
 	}
 	void qbbHeader::Print(std::ostream &os) const
 	{
-		os << "qbb:" << "pg=" << m_pg << ",seq=" << m_seq;
+		os << "qbb:" << "pg=" << m_pg << ",seq=" << m_seq << ",fn=" << m_fn;
 	}
 	uint32_t qbbHeader::GetSerializedSize(void)  const
 	{
@@ -110,7 +110,12 @@ namespace ns3 {
 	}
 	uint32_t qbbHeader::GetBaseSize() {
 		qbbHeader tmp;
-		return sizeof(tmp.sport) + sizeof(tmp.dport) + sizeof(tmp.flags) + sizeof(tmp.m_pg) + sizeof(tmp.m_seq);
+		return sizeof(tmp.sport) +
+			   sizeof(tmp.dport) +
+			   sizeof(tmp.flags) + 
+			   sizeof(tmp.m_pg) + 
+			   sizeof(tmp.m_seq) + 
+			   sizeof(tmp.m_fn);
 	}
 	void qbbHeader::Serialize(Buffer::Iterator start)  const
 	{
