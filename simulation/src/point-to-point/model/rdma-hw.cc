@@ -441,7 +441,6 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 
 	// handle cnp
 	if (cnp){
-		NS_LOG_DEBUG("received cnp");
 		if (m_cc_mode == 1){ // mlx version
 			cnp_received_mlx(qp);
 		} 
@@ -812,6 +811,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 			double U = 0;
 			uint64_t dt = 0;
 			DataRate BT = 0;
+			uint32_t fn = 0;
 			bool updated[IntHeader::maxHop] = {false}, updated_any = false;
 			NS_ASSERT(ih.nhop <= IntHeader::maxHop);
 			for (uint32_t i = 0; i < ih.nhop; i++){
@@ -838,6 +838,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 						U = u;
 						dt = tau;
 						BT = ih.hop[i].GetLineRate();
+						fn = ih.hop[i].GetFlowNum();
 					}
 				}else {
 					// for per hop (per hop R)
@@ -848,10 +849,8 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 				qp->hp.hop[i] = ih.hop[i];
 			}
 
-			uint32_t flowNum = ch.ack.fn;
-			if(flowNum != 0) {
-				NS_LOG_DEBUG("HandleAckHp: fn = " << flowNum);
-			}
+			NS_LOG_DEBUG("HandleAckHp: nhop = " << ih.nhop);
+			NS_LOG_DEBUG("HandleAckHp: fn = " << fn);
 
 			DataRate new_rate;
 			int32_t new_incStage;
@@ -859,7 +858,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 			int32_t new_incStage_per_hop[IntHeader::maxHop];
 			DataRate rai;
 			if(m_enableDynamicRai)
-				rai = BT * (1 - m_targetUtil) / flowNum;
+				rai = BT * (1 - m_targetUtil) / fn;
 			else
 				rai = m_rai;
 

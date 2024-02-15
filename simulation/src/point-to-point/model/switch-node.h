@@ -2,6 +2,8 @@
 #define SWITCH_NODE_H
 
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include <ns3/node.h>
 #include "qbb-net-device.h"
 #include "switch-mmu.h"
@@ -21,6 +23,7 @@ class SwitchNode : public Node{
 	uint32_t m_bytes[pCnt][pCnt][qCnt]; // m_bytes[inDev][outDev][qidx] is the bytes from inDev enqueued for outDev at qidx
 	
 	uint64_t m_txBytes[pCnt]; // counter of tx bytes
+	std::vector<std::unordered_set<uint32_t>> m_flows;
 
 	uint32_t m_lastPktSize[pCnt];
 	uint64_t m_lastPktTs[pCnt]; // ns

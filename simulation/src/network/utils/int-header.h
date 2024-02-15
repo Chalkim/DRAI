@@ -19,8 +19,9 @@ public:
 					 time: timeWidth,                              // TS
 					 bytes: bytesWidth,                            // rxBytes
 					 qlen: qlenWidth;                              // qLen
+			uint32_t flowNum;                                      // flowNum
 		};
-		uint32_t buf[2];
+		uint32_t buf[3];
 	};
 
 	static const uint32_t byteUnit = 128;
@@ -39,10 +40,14 @@ public:
 	uint64_t GetTime(){
 		return time;
 	}
-	void Set(uint64_t _time, uint64_t _bytes, uint32_t _qlen, uint64_t _rate){
+	uint32_t GetFlowNum(){
+		return flowNum;
+	}
+	void Set(uint64_t _time, uint64_t _bytes, uint32_t _qlen, uint64_t _rate, uint32_t _flowNum){
 		time = _time;
 		bytes = _bytes / (byteUnit * multi);
 		qlen = _qlen / (qlenUnit * multi);
+		flowNum = _flowNum;
 		switch (_rate){
 			case 25000000000lu:
 				lineRate=0;break;
@@ -102,7 +107,7 @@ public:
 
 	IntHeader();
 	static uint32_t GetStaticSize();
-	void PushHop(uint64_t time, uint64_t bytes, uint32_t qlen, uint64_t rate);
+	void PushHop(uint64_t time, uint64_t bytes, uint32_t qlen, uint64_t rate, uint32_t flowNum);
 	void Serialize (Buffer::Iterator start) const;
 	uint32_t Deserialize (Buffer::Iterator start);
 	uint64_t GetTs(void);

@@ -1,3 +1,4 @@
+#include "ns3/log.h"
 #include "ns3/ipv4.h"
 #include "ns3/packet.h"
 #include "ns3/ipv4-header.h"
@@ -11,6 +12,8 @@
 #include "ppp-header.h"
 #include "ns3/int-header.h"
 #include <cmath>
+
+NS_LOG_COMPONENT_DEFINE("SwitchNode");
 
 namespace ns3 {
 
@@ -47,6 +50,7 @@ SwitchNode::SwitchNode(){
 	m_ecmpSeed = m_id;
 	m_node_type = 1;
 	m_mmu = CreateObject<SwitchMmu>();
+	m_flows = std::vector<std::unordered_set<uint32_t>>(pCnt);
 	for (uint32_t i = 0; i < pCnt; i++)
 		for (uint32_t j = 0; j < pCnt; j++)
 			for (uint32_t k = 0; k < qCnt; k++)
@@ -124,6 +128,18 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 			if (m_mmu->CheckIngressAdmission(inDev, qIndex, p->GetSize()) && m_mmu->CheckEgressAdmission(idx, qIndex, p->GetSize())){			// Admission control
 				m_mmu->UpdateIngressAdmission(inDev, qIndex, p->GetSize());
 				m_mmu->UpdateEgressAdmission(idx, qIndex, p->GetSize());
+
+				if (ch.l3Prot == 0x11){ // UDP
+					if(ch.m_tos == 0) {
+						m_flows[idx].insert(inDev);
+						NS_LOG_DEBUG("New flow has been added, with flowId = " << inDev);
+						NS_LOG_DEBUG("Now the flowNum[" << idx << "] = " << m_flows[idx].size());
+					} else {
+						m_flows[idx].erase(inDev);
+						NS_LOG_DEBUG("Flow has been removed, with flowId = " << inDev);
+						NS_LOG_DEBUG("Now the flowNum[" << idx << "] = " << m_flows[idx].size());
+					}
+				}
 			}else{
 				return; // Drop
 			}
@@ -221,7 +237,11 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 			IntHeader *ih = (IntHeader*)&buf[PppHeader::GetStaticSize() + 20 + 8 + 6]; // ppp, ip, udp, SeqTs, INT
 			Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
 			if (m_ccMode == 3){ // HPCC
-				ih->PushHop(Simulator::Now().GetTimeStep(), m_txBytes[ifIndex], dev->GetQueue()->GetNBytesTotal(), dev->GetDataRate().GetBitRate());
+				ih->PushHop(Simulator::Now().GetTimeStep(), 
+							m_txBytes[ifIndex], 
+							dev->GetQueue()->GetNBytesTotal(), 
+							dev->GetDataRate().GetBitRate(), 
+							m_flows[ifIndex].size());
 			}else if (m_ccMode == 10){ // HPCC-PINT
 				uint64_t t = Simulator::Now().GetTimeStep();
 				uint64_t dt = t - m_lastPktTs[ifIndex];

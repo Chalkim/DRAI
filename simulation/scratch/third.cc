@@ -338,6 +338,7 @@ int main(int argc, char *argv[])
 {
 	// ns3::LogComponentEnable("QbbNetDevice", ns3::LOG_LEVEL_DEBUG);
 	ns3::LogComponentEnable("RdmaHw", ns3::LOG_LEVEL_DEBUG);
+	ns3::LogComponentEnable("SwitchNode", ns3::LOG_LEVEL_DEBUG);
 
 	clock_t begint, endt;
 	begint = clock();
