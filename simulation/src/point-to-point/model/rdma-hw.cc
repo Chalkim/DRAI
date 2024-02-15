@@ -1,3 +1,4 @@
+#include "ns3/log.h"
 #include <ns3/simulator.h>
 #include <ns3/seq-ts-header.h>
 #include <ns3/udp-header.h>
@@ -14,6 +15,9 @@
 #include "cn-header.h"
 
 namespace ns3{
+
+NS_LOG_COMPONENT_DEFINE ("RdmaHw");
+NS_OBJECT_ENSURE_REGISTERED (RdmaHw);
 
 TypeId RdmaHw::GetTypeId (void)
 {
@@ -139,6 +143,11 @@ TypeId RdmaHw::GetTypeId (void)
 				BooleanValue(false),
 				MakeBooleanAccessor(&RdmaHw::m_sampleFeedback),
 				MakeBooleanChecker())
+		.AddAttribute("EnableDynamicRai",
+				"Enable dynamic rai (DHCPP)",
+				BooleanValue(false),
+				MakeBooleanAccessor(&RdmaHw::m_enableDynamicRai),
+				MakeBooleanChecker())
 		.AddAttribute("TimelyAlpha",
 				"Alpha of TIMELY",
 				DoubleValue(0.875),
@@ -200,6 +209,8 @@ void RdmaHw::Setup(QpCompleteCallback cb){
 	}
 	// setup qp complete callback
 	m_qpCompleteCallback = cb;
+	// reset flow numver
+	m_flowNum = 0;
 }
 
 uint32_t RdmaHw::GetNicIdxOfQp(Ptr<RdmaQueuePair> qp){
@@ -267,7 +278,7 @@ Ptr<RdmaRxQueuePair> RdmaHw::GetRxQp(uint32_t sip, uint32_t dip, uint16_t sport,
 	uint64_t key = ((uint64_t)dip << 32) | ((uint64_t)pg << 16) | (uint64_t)dport;
 	auto it = m_rxQpMap.find(key);
 	if (it != m_rxQpMap.end())
-		return it->second;
+		return it->second; // found
 	if (create){
 		// create new rx qp
 		Ptr<RdmaRxQueuePair> q = CreateObject<RdmaRxQueuePair>();
@@ -279,6 +290,10 @@ Ptr<RdmaRxQueuePair> RdmaHw::GetRxQp(uint32_t sip, uint32_t dip, uint16_t sport,
 		q->m_ecn_source.qIndex = pg;
 		// store in map
 		m_rxQpMap[key] = q;
+
+		// update flow number
+		++m_flowNum;
+		NS_LOG_DEBUG("A new flow has been added, now m_flowNum = " << m_flowNum);
 		return q;
 	}
 	return NULL;
@@ -297,6 +312,13 @@ void RdmaHw::DeleteRxQp(uint32_t dip, uint16_t pg, uint16_t dport){
 }
 
 int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
+	// NS_LOG_DEBUG("Received data, tos = " << ch.m_tos);
+	if(ch.m_tos != 0) {
+		NS_LOG_DEBUG("this is the last packet, with tos = " << ch.m_tos);
+		--m_flowNum;
+		NS_ASSERT_MSG(m_flowNum >= 0, "FlowNum should always >= 0");
+		NS_LOG_DEBUG("A flow has been removed, now m_flowNum = " << m_flowNum);
+	}
 	uint8_t ecnbits = ch.GetIpv4EcnBits();
 
 	uint32_t payload_size = p->GetSize() - ch.GetSerializedSize();
@@ -318,6 +340,7 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 		seqh.SetSport(ch.udp.dport);
 		seqh.SetDport(ch.udp.sport);
 		seqh.SetIntHeader(ch.udp.ih);
+		seqh.SetFn(m_flowNum);
 		if (ecnbits)
 			seqh.SetCnp();
 
@@ -418,6 +441,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 
 	// handle cnp
 	if (cnp){
+		NS_LOG_DEBUG("received cnp");
 		if (m_cc_mode == 1){ // mlx version
 			cnp_received_mlx(qp);
 		} 
@@ -547,8 +571,13 @@ void RdmaHw::RedistributeQp(){
 
 Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
 	uint32_t payload_size = qp->GetBytesLeft();
-	if (m_mtu < payload_size)
+	bool is_last = false;
+	if (m_mtu < payload_size) {
 		payload_size = m_mtu;
+	} else {
+		is_last = true;
+	}
+
 	Ptr<Packet> p = Create<Packet> (payload_size);
 	// add SeqTsHeader
 	SeqTsHeader seqTs;
@@ -567,7 +596,7 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
 	ipHeader.SetProtocol (0x11);
 	ipHeader.SetPayloadSize (p->GetSize());
 	ipHeader.SetTtl (64);
-	ipHeader.SetTos (0);
+	ipHeader.SetTos (is_last ? 1 : 0); // set tos = 1 while finishing.
 	ipHeader.SetIdentification (qp->m_ipid);
 	p->AddHeader(ipHeader);
 	// add ppp header
@@ -782,6 +811,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 			// check each hop
 			double U = 0;
 			uint64_t dt = 0;
+			DataRate BT = 0;
 			bool updated[IntHeader::maxHop] = {false}, updated_any = false;
 			NS_ASSERT(ih.nhop <= IntHeader::maxHop);
 			for (uint32_t i = 0; i < ih.nhop; i++){
@@ -807,6 +837,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					if (u > U){
 						U = u;
 						dt = tau;
+						BT = ih.hop[i].GetLineRate();
 					}
 				}else {
 					// for per hop (per hop R)
@@ -817,10 +848,24 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 				qp->hp.hop[i] = ih.hop[i];
 			}
 
+			uint32_t flowNum = ch.ack.fn;
+			if(flowNum != 0) {
+				NS_LOG_DEBUG("HandleAckHp: fn = " << flowNum);
+			}
+
 			DataRate new_rate;
 			int32_t new_incStage;
 			DataRate new_rate_per_hop[IntHeader::maxHop];
 			int32_t new_incStage_per_hop[IntHeader::maxHop];
+			DataRate rai;
+			if(m_enableDynamicRai)
+				rai = BT * (1 - m_targetUtil) / flowNum;
+			else
+				rai = m_rai;
+
+			NS_LOG_DEBUG("BT = " << BT.GetBitRate()  / 1e6 << " mbps");
+			NS_LOG_DEBUG("rai = " << rai.GetBitRate() / 1e6 << " mbps");
+
 			if (!m_multipleRate){
 				// for aggregate (single R)
 				if (updated_any){
@@ -830,10 +875,10 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					max_c = qp->hp.u / m_targetUtil;
 
 					if (max_c >= 1 || qp->hp.m_incStage >= m_miThresh){
-						new_rate = qp->hp.m_curRate / max_c + m_rai;
+						new_rate = qp->hp.m_curRate / max_c + rai;
 						new_incStage = 0;
 					}else{
-						new_rate = qp->hp.m_curRate + m_rai;
+						new_rate = qp->hp.m_curRate + rai;
 						new_incStage = qp->hp.m_incStage+1;
 					}
 					if (new_rate < m_minRate)
@@ -856,10 +901,10 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					if (updated[i]){
 						double c = qp->hp.hopState[i].u / m_targetUtil;
 						if (c >= 1 || qp->hp.hopState[i].incStage >= m_miThresh){
-							new_rate_per_hop[i] = qp->hp.hopState[i].Rc / c + m_rai;
+							new_rate_per_hop[i] = qp->hp.hopState[i].Rc / c + rai;
 							new_incStage_per_hop[i] = 0;
 						}else{
-							new_rate_per_hop[i] = qp->hp.hopState[i].Rc + m_rai;
+							new_rate_per_hop[i] = qp->hp.hopState[i].Rc + rai;
 							new_incStage_per_hop[i] = qp->hp.hopState[i].incStage+1;
 						}
 						// bound rate

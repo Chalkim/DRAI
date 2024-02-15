@@ -64,6 +64,7 @@ uint32_t mi_thresh = 5;
 bool var_win = false, fast_react = true;
 bool multi_rate = true;
 bool sample_feedback = false;
+bool enable_dynamic_rai = false;
 double pint_log_base = 1.05;
 double pint_prob = 1.0;
 double u_target = 0.95;
@@ -335,6 +336,9 @@ uint64_t get_nic_rate(NodeContainer &n){
 
 int main(int argc, char *argv[])
 {
+	// ns3::LogComponentEnable("QbbNetDevice", ns3::LOG_LEVEL_DEBUG);
+	ns3::LogComponentEnable("RdmaHw", ns3::LOG_LEVEL_DEBUG);
+
 	clock_t begint, endt;
 	begint = clock();
 #ifndef PGO_TRAINING
@@ -644,6 +648,11 @@ int main(int argc, char *argv[])
 				conf >> v;
 				sample_feedback = v;
 				std::cout << "SAMPLE_FEEDBACK\t\t\t\t" << sample_feedback << '\n';
+			}else if(key.compare("ENABLE_DYNAMIC_RAI") == 0){
+				int v;
+				conf >> v;
+				enable_dynamic_rai = v;
+				std::cout << "SAMPLE_FEEDBACK\t\t\t\t" << enable_dynamic_rai << '\n';
 			}else if(key.compare("PINT_LOG_BASE") == 0){
 				conf >> pint_log_base;
 				std::cout << "PINT_LOG_BASE\t\t\t\t" << pint_log_base << '\n';
@@ -877,6 +886,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("FastReact", BooleanValue(fast_react));
 			rdmaHw->SetAttribute("MultiRate", BooleanValue(multi_rate));
 			rdmaHw->SetAttribute("SampleFeedback", BooleanValue(sample_feedback));
+			rdmaHw->SetAttribute("EnableDynamicRai", BooleanValue(enable_dynamic_rai));
 			rdmaHw->SetAttribute("TargetUtil", DoubleValue(u_target));
 			rdmaHw->SetAttribute("RateBound", BooleanValue(rate_bound));
 			rdmaHw->SetAttribute("DctcpRateAI", DataRateValue(DataRate(dctcp_rate_ai)));

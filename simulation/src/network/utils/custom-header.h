@@ -123,6 +123,7 @@ public:
 		  uint16_t flags;
 		  uint16_t pg;
 		  uint32_t seq; // the qbb sequence number.
+      uint32_t fn;
 		  IntHeader ih;
 	  } ack;
 	  // PauseHeader

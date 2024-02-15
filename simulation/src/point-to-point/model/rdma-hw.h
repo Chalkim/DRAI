@@ -129,6 +129,12 @@ public:
 	void FastReactHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 
 	/**********************
+	 * DHPCC
+	 **********************/
+	int32_t m_flowNum;
+	bool m_enableDynamicRai;
+
+	/**********************
 	 * TIMELY
 	 *********************/
 	double m_tmly_alpha, m_tmly_beta;

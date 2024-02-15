@@ -310,6 +310,7 @@ CustomHeader::Deserialize (Buffer::Iterator start)
 		  ack.flags = i.ReadU16();
 		  ack.pg = i.ReadU16();
 		  ack.seq = i.ReadU32();
+		  ack.fn = i.ReadU32();
 		  if (getInt)
 			  ack.ih.Deserialize(i);
 		  l4Size = GetAckSerializedSize();
@@ -329,7 +330,13 @@ uint8_t CustomHeader::GetIpv4EcnBits (void) const{
 }
 
 uint32_t CustomHeader::GetAckSerializedSize(void){
-	return sizeof(ack.sport) + sizeof(ack.dport) + sizeof(ack.flags) + sizeof(ack.pg) + sizeof(ack.seq) + IntHeader::GetStaticSize();
+	return sizeof(ack.sport) +
+		   sizeof(ack.dport) +
+		   sizeof(ack.flags) +
+		   sizeof(ack.pg) +
+		   sizeof(ack.seq) +
+		   sizeof(ack.fn) +
+		   IntHeader::GetStaticSize();
 }
 
 uint32_t CustomHeader::GetUdpHeaderSize(void){
