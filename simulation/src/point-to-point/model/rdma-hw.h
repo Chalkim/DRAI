@@ -131,7 +131,6 @@ public:
 	/**********************
 	 * DHPCC
 	 **********************/
-	int32_t m_flowNum;
 	bool m_enableDynamicRai;
 
 	/**********************

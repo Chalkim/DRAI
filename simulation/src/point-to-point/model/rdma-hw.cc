@@ -209,8 +209,6 @@ void RdmaHw::Setup(QpCompleteCallback cb){
 	}
 	// setup qp complete callback
 	m_qpCompleteCallback = cb;
-	// reset flow numver
-	m_flowNum = 0;
 }
 
 uint32_t RdmaHw::GetNicIdxOfQp(Ptr<RdmaQueuePair> qp){
@@ -290,10 +288,6 @@ Ptr<RdmaRxQueuePair> RdmaHw::GetRxQp(uint32_t sip, uint32_t dip, uint16_t sport,
 		q->m_ecn_source.qIndex = pg;
 		// store in map
 		m_rxQpMap[key] = q;
-
-		// update flow number
-		++m_flowNum;
-		NS_LOG_DEBUG("A new flow has been added, now m_flowNum = " << m_flowNum);
 		return q;
 	}
 	return NULL;
@@ -312,13 +306,6 @@ void RdmaHw::DeleteRxQp(uint32_t dip, uint16_t pg, uint16_t dport){
 }
 
 int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
-	// NS_LOG_DEBUG("Received data, tos = " << ch.m_tos);
-	if(ch.m_tos != 0) {
-		NS_LOG_DEBUG("this is the last packet, with tos = " << ch.m_tos);
-		--m_flowNum;
-		NS_ASSERT_MSG(m_flowNum >= 0, "FlowNum should always >= 0");
-		NS_LOG_DEBUG("A flow has been removed, now m_flowNum = " << m_flowNum);
-	}
 	uint8_t ecnbits = ch.GetIpv4EcnBits();
 
 	uint32_t payload_size = p->GetSize() - ch.GetSerializedSize();
@@ -340,7 +327,6 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 		seqh.SetSport(ch.udp.dport);
 		seqh.SetDport(ch.udp.sport);
 		seqh.SetIntHeader(ch.udp.ih);
-		seqh.SetFn(m_flowNum);
 		if (ecnbits)
 			seqh.SetCnp();
 
@@ -575,6 +561,8 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
 		payload_size = m_mtu;
 	} else {
 		is_last = true;
+		static int cfn = 0;
+		NS_LOG_DEBUG("completedFlowNum = " << ++cfn);
 	}
 
 	Ptr<Packet> p = Create<Packet> (payload_size);
@@ -849,8 +837,8 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 				qp->hp.hop[i] = ih.hop[i];
 			}
 
-			NS_LOG_DEBUG("HandleAckHp: nhop = " << ih.nhop);
-			NS_LOG_DEBUG("HandleAckHp: fn = " << fn);
+			// NS_LOG_DEBUG("HandleAckHp: nhop = " << ih.nhop);
+			// NS_LOG_DEBUG("HandleAckHp: fn = " << fn);
 
 			DataRate new_rate;
 			int32_t new_incStage;
@@ -858,12 +846,12 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 			int32_t new_incStage_per_hop[IntHeader::maxHop];
 			DataRate rai;
 			if(m_enableDynamicRai)
-				rai = BT * (1 - m_targetUtil) / fn;
+				rai = BT * (1 - m_targetUtil) / fn * 1.5;
 			else
 				rai = m_rai;
 
-			NS_LOG_DEBUG("BT = " << BT.GetBitRate()  / 1e6 << " mbps");
-			NS_LOG_DEBUG("rai = " << rai.GetBitRate() / 1e6 << " mbps");
+			// NS_LOG_DEBUG("BT = " << BT.GetBitRate()  / 1e6 << " mbps");
+			// NS_LOG_DEBUG("rai = " << rai.GetBitRate() / 1e6 << " mbps");
 
 			if (!m_multipleRate){
 				// for aggregate (single R)

@@ -130,11 +130,13 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 				m_mmu->UpdateEgressAdmission(idx, qIndex, p->GetSize());
 
 				if (ch.l3Prot == 0x11){ // UDP
-					if(ch.m_tos == 0) {
+					if(m_flows[idx].find(inDev) == m_flows[idx].end()){
+						// new flow
 						m_flows[idx].insert(inDev);
 						NS_LOG_DEBUG("New flow has been added, with flowId = " << inDev);
 						NS_LOG_DEBUG("Now the flowNum[" << idx << "] = " << m_flows[idx].size());
-					} else {
+					}
+					if(ch.m_tos != 0) {
 						m_flows[idx].erase(inDev);
 						NS_LOG_DEBUG("Flow has been removed, with flowId = " << inDev);
 						NS_LOG_DEBUG("Now the flowNum[" << idx << "] = " << m_flows[idx].size());

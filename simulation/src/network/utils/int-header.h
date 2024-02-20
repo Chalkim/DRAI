@@ -13,16 +13,20 @@ public:
 	static const uint32_t bytesWidth = 20;
 	static const uint32_t qlenWidth = 17;
 	static const uint64_t lineRateValues[8];
+
+	#pragma pack(push, 8)  // default 8-byte alignment on x86_64
+	#pragma pack(4)
 	union{
 		struct {
 			uint64_t lineRate: 64-timeWidth-bytesWidth-qlenWidth,  // B
-					 time: timeWidth,                              // TS
-					 bytes: bytesWidth,                            // rxBytes
-					 qlen: qlenWidth;                              // qLen
+			         time: timeWidth,                              // TS
+			         bytes: bytesWidth,                            // rxBytes
+			         qlen: qlenWidth;                              // qLen
 			uint32_t flowNum;                                      // flowNum
 		};
 		uint32_t buf[3];
 	};
+	#pragma pack(pop)
 
 	static const uint32_t byteUnit = 128;
 	static const uint32_t qlenUnit = 80;
