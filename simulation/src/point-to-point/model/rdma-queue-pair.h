@@ -48,6 +48,7 @@ public:
 	struct {
 		uint32_t m_lastUpdateSeq;
 		DataRate m_curRate;
+		DataRate m_lastRate;
 		IntHop hop[IntHeader::maxHop];
 		uint32_t keep[IntHeader::maxHop];
 		uint32_t m_incStage;

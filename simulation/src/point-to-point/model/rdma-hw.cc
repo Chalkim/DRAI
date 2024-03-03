@@ -12,8 +12,12 @@
 #include "ppp-header.h"
 #include "qbb-header.h"
 #include "cn-header.h"
+#include "ns3/log.h"
 
 namespace ns3{
+
+NS_LOG_COMPONENT_DEFINE ("RdmaHw");
+NS_OBJECT_ENSURE_REGISTERED (RdmaHw);
 
 TypeId RdmaHw::GetTypeId (void)
 {
@@ -782,6 +786,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 			// check each hop
 			double U = 0;
 			uint64_t dt = 0;
+			DataRate BT = 0;
 			bool updated[IntHeader::maxHop] = {false}, updated_any = false;
 			NS_ASSERT(ih.nhop <= IntHeader::maxHop);
 			for (uint32_t i = 0; i < ih.nhop; i++){
@@ -797,7 +802,9 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 				uint64_t tau = ih.hop[i].GetTimeDelta(qp->hp.hop[i]);;
 				double duration = tau * 1e-9;
 				double txRate = (ih.hop[i].GetBytesDelta(qp->hp.hop[i])) * 8 / duration;
-				double u = txRate / ih.hop[i].GetLineRate() + (double)std::min(ih.hop[i].GetQlen(), qp->hp.hop[i].GetQlen()) * qp->m_max_rate.GetBitRate() / ih.hop[i].GetLineRate() /qp->m_win;
+				double u1 = txRate / ih.hop[i].GetLineRate();
+				double u2 = (double)std::min(ih.hop[i].GetQlen(), qp->hp.hop[i].GetQlen()) * qp->m_max_rate.GetBitRate() / ih.hop[i].GetLineRate() /qp->m_win;
+				double u = u1 + u2;
 				#if PRINT_LOG
 				if (print)
 					printf(" %.3lf %.3lf", txRate, u);
@@ -807,6 +814,7 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					if (u > U){
 						U = u;
 						dt = tau;
+						BT = ih.hop[i].GetLineRate();
 					}
 				}else {
 					// for per hop (per hop R)
@@ -816,6 +824,16 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 				}
 				qp->hp.hop[i] = ih.hop[i];
 			}
+
+			DataRate rai;
+			uint64_t abs_delta_rate;
+			double lambda;
+			abs_delta_rate = abs(qp->hp.m_curRate.GetBitRate() - qp->hp.m_lastRate.GetBitRate());
+			qp->hp.m_lastRate = qp->hp.m_curRate;
+			lambda = double(abs_delta_rate) / (BT.GetBitRate() * (1 - m_targetUtil));
+			lambda = lambda * lambda;
+			if(BT.GetBitRate() != 25 * 1e9) NS_LOG_DEBUG("BT = " << BT.GetBitRate() / 1e6 << " mbps");
+			rai = BT * (1 - m_targetUtil) / (200 * (1 - lambda));
 
 			DataRate new_rate;
 			int32_t new_incStage;
@@ -830,10 +848,10 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					max_c = qp->hp.u / m_targetUtil;
 
 					if (max_c >= 1 || qp->hp.m_incStage >= m_miThresh){
-						new_rate = qp->hp.m_curRate / max_c + m_rai;
+						new_rate = qp->hp.m_curRate / max_c + rai;
 						new_incStage = 0;
 					}else{
-						new_rate = qp->hp.m_curRate + m_rai;
+						new_rate = qp->hp.m_curRate + rai;
 						new_incStage = qp->hp.m_incStage+1;
 					}
 					if (new_rate < m_minRate)
@@ -856,10 +874,10 @@ void RdmaHw::UpdateRateHp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch
 					if (updated[i]){
 						double c = qp->hp.hopState[i].u / m_targetUtil;
 						if (c >= 1 || qp->hp.hopState[i].incStage >= m_miThresh){
-							new_rate_per_hop[i] = qp->hp.hopState[i].Rc / c + m_rai;
+							new_rate_per_hop[i] = qp->hp.hopState[i].Rc / c + rai;
 							new_incStage_per_hop[i] = 0;
 						}else{
-							new_rate_per_hop[i] = qp->hp.hopState[i].Rc + m_rai;
+							new_rate_per_hop[i] = qp->hp.hopState[i].Rc + rai;
 							new_incStage_per_hop[i] = qp->hp.hopState[i].incStage+1;
 						}
 						// bound rate

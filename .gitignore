@@ -1,0 +1,8 @@
+fct_dhpcc*
+pfc_dhpcc*
+*.pyc
+mix.tr
+
+/simulation/build
+/simulation/.waf-*
+/simulation/.lock*
