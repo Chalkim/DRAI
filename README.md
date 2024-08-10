@@ -1,5 +1,5 @@
 # DRAI simulation
-[Project page of DRAI](https://hpcc-group.github.io/) includes latest news of DRAI and extensive evaluation results using this simulator.
+Project page of DRAI includes latest news of DRAI and extensive evaluation results using this simulator.
 
 This is the simulator for [Congestion control in data center networks](). It also includes the implementation of HPCC, HPCC-PINT, DCQCN, TIMELY, DCTCP, PFC, ECN and Broadcom shared buffer switch.
 
